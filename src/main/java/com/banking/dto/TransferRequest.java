@@ -1,15 +1,13 @@
 package com.banking.dto;
 import jakarta.validation.constraints.*;
+import lombok.Data;
 import lombok.Getter;
 
 import java.util.UUID;
+@Data
 public class TransferRequest {
-    @Getter
     @NotNull private UUID fromAccountId;
-    @Getter
     @NotNull private UUID toAccountId;
-    @Getter
     @NotNull @Positive private Long amount;
-    @Getter
     @NotBlank private String idempotencyKey;
 }

@@ -39,22 +39,22 @@ public class TransactionService {
 
         Transaction txn = buildTxn(TransactionType.DEPOSIT,
                 null, req.getAccountId(), req.getAmount(), req.getIdempotencyKey());
-        AuditLog auditLog = auditService.buildAudit();
 
         Account account = lockAccount(req.getAccountId());
 
         if (account.getStatus() == AccountStatus.CLOSED) {
             return failTxn(txn, req.getAccountId(), AuditOperation.CREDIT, FailureReason.ACCOUNT_CLOSED);
         }
-
+        
         long before = account.getBalance();
         account.setBalance(before + req.getAmount());
+        long after = account.getBalance();
         accountRepo.save(account);
 
         txn.setStatus(TransactionStatus.SUCCESS);
         txnRepo.save(txn);
-//        auditRepo.save(txn.getId(), account.getId(),
-//                AuditOperation.CREDIT, req.getAmount(), before, account.getBalance());
+        AuditLog auditLog =  auditService.buildAudit(account, txn, AuditOperation.CREDIT, before, after, null);
+        auditRepo.save(auditLog);
         return txn;
     }
 
@@ -81,12 +81,13 @@ public class TransactionService {
 
         long before = account.getBalance();
         account.setBalance(before - req.getAmount());
+        long after = account.getBalance();
         accountRepo.save(account);
 
         txn.setStatus(TransactionStatus.SUCCESS);
         txnRepo.save(txn);
-//        auditRepo.save(AuditLog.success(txn.getId(), account.getId(),
-//                AuditOperation.DEBIT, req.getAmount(), before, account.getBalance()));
+        AuditLog auditLog =  auditService.buildAudit(account, txn, AuditOperation.DEBIT, before, after, null);
+        auditRepo.save(auditLog);
         return txn;
     }
 
@@ -144,10 +145,11 @@ public class TransactionService {
         txn.setStatus(TransactionStatus.SUCCESS);
         txnRepo.save(txn);
 
-//        auditRepo.save(AuditLog.success(txn.getId(), source.getId(),
-//                AuditOperation.DEBIT,  req.getAmount(), sourceBefore, source.getBalance()));
-//        auditRepo.save(AuditLog.success(txn.getId(), target.getId(),
-//                AuditOperation.CREDIT, req.getAmount(), targetBefore, target.getBalance()));
+        AuditLog auditLogDebit =  auditService.buildAudit(source, txn, AuditOperation.DEBIT, sourceBefore, source.getBalance(), null);
+        AuditLog auditLogCredit =  auditService.buildAudit(source, txn, AuditOperation.CREDIT, targetBefore, target.getBalance(), null);
+
+        auditRepo.save(auditLogDebit);
+        auditRepo.save(auditLogCredit);
         return txn;
     }
 
@@ -158,7 +160,7 @@ public class TransactionService {
     // attempt for the same txn hits checkIdempotency() and is rejected
     // before any balance is touched — enforces exactly-once reversal.
 
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.READ_COMMITTED, noRollbackFor = BankingException.class)
     public Transaction reverse(ReversalRequest req) {
         String reversalKey = "reversal:" + req.getTransactionId();
         checkIdempotency(reversalKey);
@@ -182,40 +184,41 @@ public class TransactionService {
         switch (original.getType()) {
 
             case DEPOSIT -> {
-                Account acc   = lockAccount(original.getToAccountId());
-                if (acc.getBalance() < original.getAmount())
-                    return failReversalTxn(reversal, acc.getId(),
+                Account sourceReversal   = lockAccount(original.getToAccountId());
+                
+                if (sourceReversal.getBalance() < original.getAmount())
+                    return failReversalTxn(reversal, sourceReversal.getId(),
                             AuditOperation.REVERSAL_DEBIT, FailureReason.INSUFFICIENT_FUNDS);
-                long before = acc.getBalance();
-                acc.setBalance(before - original.getAmount());
-                accountRepo.save(acc);
+                long before = sourceReversal.getBalance();
+                sourceReversal.setBalance(before - original.getAmount());
+                accountRepo.save(sourceReversal);
                 reversal.setStatus(TransactionStatus.SUCCESS);
                 txnRepo.save(reversal);
-//                auditRepo.save(AuditLog.success(reversal.getId(), acc.getId(),
-//                        AuditOperation.REVERSAL_DEBIT, original.getAmount(), before, acc.getBalance()));
+                AuditLog auditLogDebit =  auditService.buildAudit(sourceReversal, reversal, AuditOperation.REVERSAL_DEBIT, before, sourceReversal.getBalance(), null);
+                auditRepo.save(auditLogDebit);
             }
 
             case WITHDRAWAL -> {
-                Account acc = lockAccount(original.getFromAccountId());
-                if (acc.getStatus() == AccountStatus.CLOSED)
-                    return failReversalTxn(reversal, acc.getId(),
+                Account sourceReversal = lockAccount(original.getFromAccountId());
+                if (sourceReversal.getStatus() == AccountStatus.CLOSED)
+                    return failReversalTxn(reversal, sourceReversal.getId(),
                             AuditOperation.REVERSAL_CREDIT, FailureReason.ACCOUNT_CLOSED);
-                long before = acc.getBalance();
-                acc.setBalance(before + original.getAmount());
-                accountRepo.save(acc);
+                long before = sourceReversal.getBalance();
+                sourceReversal.setBalance(before + original.getAmount());
+                accountRepo.save(sourceReversal);
                 reversal.setStatus(TransactionStatus.SUCCESS);
                 txnRepo.save(reversal);
-//                auditRepo.save(AuditLog.success(reversal.getId(), acc.getId(),
-//                        AuditOperation.REVERSAL_CREDIT, original.getAmount(), before, acc.getBalance()));
+                AuditLog auditLogDebit =  auditService.buildAudit(sourceReversal, reversal, AuditOperation.REVERSAL_CREDIT, before, sourceReversal.getBalance(), null);
+                auditRepo.save(auditLogDebit);
             }
 
             case TRANSFER -> {
-                UUID firstId  = min(original.getFromAccountId(), original.getToAccountId());
+                UUID firstId = min(original.getFromAccountId(), original.getToAccountId());
                 UUID secondId = max(original.getFromAccountId(), original.getToAccountId());
-                Account first  = lockAccount(firstId);
+                Account first = lockAccount(firstId);
                 Account second = lockAccount(secondId);
                 Account source = first.getId().equals(original.getFromAccountId()) ? first : second;
-                Account target = first.getId().equals(original.getToAccountId())   ? first : second;
+                Account target = first.getId().equals(original.getToAccountId()) ? first : second;
 
                 if (target.getBalance() < original.getAmount())
                     return failReversalTxn(reversal, target.getId(),
@@ -229,10 +232,11 @@ public class TransactionService {
                 accountRepo.save(target);
                 reversal.setStatus(TransactionStatus.SUCCESS);
                 txnRepo.save(reversal);
-//                auditRepo.save(AuditLog.success(reversal.getId(), source.getId(),
-//                        AuditOperation.REVERSAL_CREDIT, original.getAmount(), sourceBefore, source.getBalance()));
-//                auditRepo.save(AuditLog.success(reversal.getId(), target.getId(),
-//                        AuditOperation.REVERSAL_DEBIT,  original.getAmount(), targetBefore, target.getBalance()));
+                AuditLog auditLogDebit =  auditService.buildAudit(source, reversal, AuditOperation.REVERSAL_DEBIT, sourceBefore, source.getBalance(), null);
+                auditRepo.save(auditLogDebit);
+
+                AuditLog auditLogCredit =  auditService.buildAudit(target, reversal, AuditOperation.REVERSAL_CREDIT, targetBefore, target.getBalance(), null);
+                auditRepo.save(auditLogCredit);
             }
 
             default -> throw new BankingException(FailureReason.REVERSAL_NOT_ALLOWED);
@@ -272,8 +276,10 @@ public class TransactionService {
                                   AuditOperation op, FailureReason reason) {
         txn.setStatus(TransactionStatus.FAILED);
         txn.setFailureReason(reason);
+        Account account = lockAccount(accountId);
         txnRepo.save(txn);
-//        auditRepo.save(auditService.failure(txn.getId(), accountId, op, txn.getAmount(), reason));
+        AuditLog auditLog =  auditService.buildAudit(account, txn, op, account.getBalance(), account.getBalance(), reason);
+        auditRepo.save(auditLog);
         throw new BankingException(reason);
     }
 
@@ -282,7 +288,8 @@ public class TransactionService {
         reversal.setStatus(TransactionStatus.FAILED);
         reversal.setFailureReason(reason);
         txnRepo.save(reversal);
-//        auditRepo.save(AuditLog.failure(reversal.getId(), accountId, op, reversal.getAmount(), reason));
+        Account account = lockAccount(accountId);
+        AuditLog auditLog =  auditService.buildAudit(account, reversal, op, account.getBalance(), account.getBalance(), reason);
         throw new BankingException(reason);
     }
 
