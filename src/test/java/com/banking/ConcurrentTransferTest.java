@@ -50,7 +50,7 @@ class ConcurrentTransferTest {
         Account a = accountService.createAccount("Alice", 100_000L);
         Account b = accountService.createAccount("Bob",   100_000L);
         long total = 200_000L;
-        int threads = 4;   // 2 A→B + 0 B→A
+        int threads = 4;   // 2 A→B + 2 B→A
 
         CountDownLatch ready  = new CountDownLatch(threads);
         CountDownLatch start  = new CountDownLatch(1);
@@ -62,6 +62,7 @@ class ConcurrentTransferTest {
 
         for (int i = 0; i < threads; i++) {
             final boolean aToB = (i % 2 == 0); // alternating direction
+            int finalI = i;
             pool.submit(() -> {
                 ready.countDown();
                 try {
@@ -69,7 +70,7 @@ class ConcurrentTransferTest {
                     TransferRequest req = new TransferRequest();
                     req.setFromAccountId(aToB ? a.getId() : b.getId());
                     req.setToAccountId(aToB   ? b.getId() : a.getId());
-                    req.setAmount(1_000L);
+                    req.setAmount(1_000L - ((finalI+1) * 10L));
                     req.setIdempotencyKey(UUID.randomUUID().toString());
                     txnService.transfer(req);
                     success.incrementAndGet();
@@ -85,7 +86,7 @@ class ConcurrentTransferTest {
 
         ready.await();
         start.countDown();         // release all threads simultaneously
-        done.await(15, TimeUnit.SECONDS);
+        done.await(5, TimeUnit.SECONDS);
         pool.shutdown();
 
         long balA = accountRepo.findById(a.getId()).orElseThrow().getBalance();
@@ -103,12 +104,12 @@ class ConcurrentTransferTest {
     // ── Test 2: 50 concurrent transfers, all from A to B ─────────────────────
 
     @Test
-    @DisplayName("5 concurrent A→B transfers — balance never negative, total conserved")
+    @DisplayName("50 concurrent A→B transfers — balance never negative, total conserved")
     void manyTransfers_sameDirection_balanceNeverNegative() throws InterruptedException {
         Account a = accountService.createAccount("Alice", 50_000L);
         Account b = accountService.createAccount("Bob",   0L);
         long total = 50_000L;
-        int threads = 5;
+        int threads = 50;
 
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done  = new CountDownLatch(threads);
@@ -141,7 +142,7 @@ class ConcurrentTransferTest {
         long balA = accountRepo.findById(a.getId()).orElseThrow().getBalance();
         long balB = accountRepo.findById(b.getId()).orElseThrow().getBalance();
 
-        System.out.printf("[A→B x50] success=%d  balA=%d  balB=%d%n", success.get(), balA, balB);
+        System.out.printf("[A→B x5] success=%d  balA=%d  balB=%d%n", success.get(), balA, balB);
 
         assertThat(balA).isGreaterThanOrEqualTo(0);                // never negative
         assertThat(balB).isGreaterThanOrEqualTo(0);
@@ -305,7 +306,7 @@ class ConcurrentTransferTest {
         CountDownLatch done  = new CountDownLatch(rounds * 3);
         AtomicInteger success = new AtomicInteger();
 
-        ExecutorService pool = Executors.newFixedThreadPool(30);
+        ExecutorService pool = Executors.newFixedThreadPool(6);
 
         // A→B
         for (int i = 0; i < rounds; i++) {

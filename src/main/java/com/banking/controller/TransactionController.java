@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/transactions")
 public class TransactionController {
@@ -18,6 +20,11 @@ public class TransactionController {
 
     public TransactionController(TransactionService txnService) {
         this.txnService = txnService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Transaction>> list() {
+        return ResponseEntity.ok(txnService.listAll());
     }
 
     @PostMapping("/deposit")

@@ -5,9 +5,11 @@ import com.banking.enums.AccountStatus;
 import com.banking.exception.BankingException;
 import com.banking.enums.FailureReason;
 import com.banking.repository.AccountRepository;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -17,6 +19,10 @@ public class AccountService {
 
     public AccountService(AccountRepository accountRepo) {
         this.accountRepo = accountRepo;
+    }
+
+    public List<Account> listAccounts() {
+        return accountRepo.findAll(Sort.by(Sort.Direction.ASC, "createdAt"));
     }
 
     @Transactional

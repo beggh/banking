@@ -48,6 +48,10 @@ public class Account {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Version
+    @Column(name = "version_no")
+    private Integer versionNo;
+
     @PrePersist
     private void prePersist() {
         if (id == null)        id = UUID.randomUUID();
@@ -55,4 +59,16 @@ public class Account {
         if (status == null)    status = AccountStatus.ACTIVE;
         if (balance == null)   balance = 0L;
     }
+
+    @Override
+    public String toString() {
+        return "Account{" +
+                "id=" + id +
+                ", ownerName='" + ownerName + '\'' +
+                ", balance=" + balance +
+                ", status=" + status +
+                ", createdAt=" + createdAt +
+                '}';
+    }
+
 }

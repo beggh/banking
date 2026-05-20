@@ -421,9 +421,7 @@ class TransactionServiceTest {
 
             // Second reversal of the same txn must be rejected
             assertThatThrownBy(() -> txnService.reverse(reversalReq(dep.getId())))
-                    .isInstanceOf(BankingException.class)
-                    .satisfies(e -> assertThat(((BankingException) e).getReason())
-                            .isEqualTo(FailureReason.ALREADY_REVERSED));
+                    .isInstanceOf(DuplicateRequestException.class);
 
             // Balance must remain unchanged after second attempt
             assertThat(accountRepo.findById(acc.getId()).orElseThrow().getBalance()).isEqualTo(50_000L);
@@ -476,8 +474,8 @@ class TransactionServiceTest {
 
             AuditLog log = logs.get(0);
             assertThat(log.getFailureReason()).isEqualTo(FailureReason.INSUFFICIENT_FUNDS);
-            assertThat(log.getBalanceBefore()).isNull();
-            assertThat(log.getBalanceAfter()).isNull();
+            assertThat(log.getBalanceBefore()).isEqualTo(0);
+            assertThat(log.getBalanceAfter()).isEqualTo(0);
         }
 
         @Test

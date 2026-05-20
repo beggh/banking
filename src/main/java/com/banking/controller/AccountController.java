@@ -6,6 +6,7 @@ import com.banking.service.AccountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -17,6 +18,11 @@ public class AccountController {
 
     public AccountController(AccountService accountService) {
         this.accountService = accountService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Account>> list() {
+        return ResponseEntity.ok(accountService.listAccounts());
     }
 
     @PostMapping

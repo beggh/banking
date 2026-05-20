@@ -6,10 +6,12 @@ import com.banking.enums.*;
 import com.banking.exception.BankingException;
 import com.banking.exception.DuplicateRequestException;
 import com.banking.repository.*;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -19,6 +21,10 @@ public class TransactionService {
     private final TransactionRepository txnRepo;
     private final AuditLogRepository    auditRepo;
     private final AuditService auditService;
+
+    public List<Transaction> listAll() {
+        return txnRepo.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
 
     public TransactionService(AccountRepository accountRepo,
                                TransactionRepository txnRepo,
@@ -141,12 +147,13 @@ public class TransactionService {
 
         accountRepo.save(source);
         accountRepo.save(target);
+        System.out.println(target.toString());
 
         txn.setStatus(TransactionStatus.SUCCESS);
         txnRepo.save(txn);
 
         AuditLog auditLogDebit =  auditService.buildAudit(source, txn, AuditOperation.DEBIT, sourceBefore, source.getBalance(), null);
-        AuditLog auditLogCredit =  auditService.buildAudit(source, txn, AuditOperation.CREDIT, targetBefore, target.getBalance(), null);
+        AuditLog auditLogCredit =  auditService.buildAudit(target, txn, AuditOperation.CREDIT, targetBefore, target.getBalance(), null);
 
         auditRepo.save(auditLogDebit);
         auditRepo.save(auditLogCredit);
@@ -232,10 +239,10 @@ public class TransactionService {
                 accountRepo.save(target);
                 reversal.setStatus(TransactionStatus.SUCCESS);
                 txnRepo.save(reversal);
-                AuditLog auditLogDebit =  auditService.buildAudit(source, reversal, AuditOperation.REVERSAL_DEBIT, sourceBefore, source.getBalance(), null);
+                AuditLog auditLogDebit =  auditService.buildAudit(target, reversal, AuditOperation.REVERSAL_DEBIT, targetBefore, target.getBalance(), null);
                 auditRepo.save(auditLogDebit);
 
-                AuditLog auditLogCredit =  auditService.buildAudit(target, reversal, AuditOperation.REVERSAL_CREDIT, targetBefore, target.getBalance(), null);
+                AuditLog auditLogCredit =  auditService.buildAudit(source, reversal, AuditOperation.REVERSAL_CREDIT, sourceBefore, source.getBalance(), null);
                 auditRepo.save(auditLogCredit);
             }
 

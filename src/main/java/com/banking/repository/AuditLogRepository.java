@@ -12,5 +12,5 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     List<AuditLog> findByAccountIdOrderByCreatedAtAsc(@Param("id") UUID id);
 
     @Query("SELECT a FROM AuditLog a WHERE a.account.id = :id ORDER BY a.createdAt DESC")
-    List<AuditLog> findByAccountIdOrderByCreatedAtDesc(UUID accountId);
+    List<AuditLog> findByAccountIdOrderByCreatedAtDesc(UUID id);
 }
