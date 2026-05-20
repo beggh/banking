@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Banking Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:    #1a56db;
+      --blue-dk: #1e429f;
+      --green:   #057a55;
+      --red:     #c81e1e;
+      --orange:  #b45309;
+      --gray:    #6b7280;
+      --gray-lt: #f3f4f6;
+      --border:  #e5e7eb;
+      --text:    #111827;
+      --radius:  8px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f9fafb;
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--blue-dk);
+      color: #fff;
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    }
+    header svg { width: 28px; height: 28px; flex-shrink: 0; }
+    header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.3px; }
+    header .spacer { flex: 1; }
+    header .refresh-btn {
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.3);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: .85rem;
+      transition: background .15s;
+    }
+    header .refresh-btn:hover { background: rgba(255,255,255,.25); }
+
+    /* ── Layout ── */
+    .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--blue-dk);
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--gray-lt);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title svg { width: 18px; height: 18px; color: var(--blue); }
+
+    /* ── Tables ── */
+    .tbl-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    thead th {
+      background: var(--gray-lt);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--gray);
+      text-transform: uppercase;
+      font-size: .75rem;
+      letter-spacing: .05em;
+    }
+    tbody tr { border-top: 1px solid var(--border); }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 11px 14px; vertical-align: middle; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: .75rem;
+      font-weight: 600;
+    }
+    .badge-active   { background: #d1fae5; color: #065f46; }
+    .badge-frozen   { background: #dbeafe; color: #1e40af; }
+    .badge-closed   { background: #fee2e2; color: #991b1b; }
+    .badge-success  { background: #d1fae5; color: #065f46; }
+    .badge-failed   { background: #fee2e2; color: #991b1b; }
+    .badge-reversed { background: #ede9fe; color: #5b21b6; }
+    .badge-pending  { background: #fef3c7; color: #92400e; }
+    .badge-transfer { background: #dbeafe; color: #1e3a5f; }
+    .badge-deposit  { background: #d1fae5; color: #064e3b; }
+    .badge-withdrawal { background: #fef3c7; color: #78350f; }
+    .badge-reversal { background: #ede9fe; color: #4c1d95; }
+
+    /* ── Forms ── */
+    .form-row { display: flex; flex-direction: column; gap: 14px; }
+    label { font-size: .85rem; font-weight: 600; color: var(--gray); display: block; margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .9rem;
+      color: var(--text);
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,86,219,.12); }
+    .amount-wrap { position: relative; }
+    .amount-wrap .currency {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gray);
+      font-weight: 600;
+      pointer-events: none;
+    }
+    .amount-wrap input { padding-left: 28px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter .15s, opacity .15s;
+    }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn:not(:disabled):hover { filter: brightness(.93); }
+    .btn-primary  { background: var(--blue);   color: #fff; }
+    .btn-success  { background: var(--green);  color: #fff; }
+    .btn-danger   { background: var(--red);    color: #fff; }
+    .btn-warning  { background: var(--orange); color: #fff; }
+    .btn-sm       { padding: 5px 11px; font-size: .8rem; }
+    .btn-ghost    { background: var(--gray-lt); color: var(--text); border: 1px solid var(--border); }
+
+    /* ── Alert banners ── */
+    .alert {
+      display: none;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: .88rem;
+      font-weight: 500;
+      margin-top: 14px;
+      border-left: 4px solid transparent;
+    }
+    .alert.show { display: block; }
+    .alert-success { background: #ecfdf5; border-color: #059669; color: #065f46; }
+    .alert-error   { background: #fef2f2; border-color: #dc2626; color: #991b1b; }
+    .alert-info    { background: #eff6ff; border-color: #3b82f6; color: #1e3a8a; }
+
+    /* ── Misc ── */
+    .mt-16 { margin-top: 16px; }
+    .text-right { text-align: right; }
+    .text-mono { font-family: "SF Mono", "Fira Code", monospace; font-size: .82rem; color: var(--gray); }
+    .empty-state { text-align: center; padding: 32px; color: var(--gray); font-size: .9rem; }
+    .section-gap { margin-top: 28px; }
+
+    /* ── Create account collapsible ── */
+    .collapse-toggle {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 7px 14px;
+      font-size: .85rem;
+      cursor: pointer;
+      color: var(--blue);
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .collapse-toggle:hover { background: var(--gray-lt); }
+    .collapsible { display: none; }
+    .collapsible.open { display: block; }
+
+    /* ── Spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    /* ── Truncate UUID ── */
+    .uuid { font-family: monospace; font-size: .78rem; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+  </svg>
+  <h1>Banking Dashboard</h1>
+  <div class="spacer"></div>
+  <button class="refresh-btn" onclick="refreshAll()">&#8635; Refresh</button>
+</header>
+
+<div class="page">
+
+  <!-- ── Top row: Accounts + Transfer ── -->
+  <div class="grid-2">
+
+    <!-- ACCOUNTS PANEL -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="7" r="4"/><path d="M6 21v-2a6 6 0 0 1 12 0v2"/>
+        </svg>
+        Accounts
+      </div>
+
+      <div class="tbl-wrap">
+        <table id="accounts-table">
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th>Account ID</th>
+            </tr>
+          </thead>
+          <tbody id="accounts-body">
+            <tr><td colspan="4" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Create Account -->
+      <div class="mt-16">
+        <button class="collapse-toggle" onclick="toggleCreate()">
+          <span>+</span> New Account
+        </button>
+        <div id="create-panel" class="collapsible mt-16">
+          <div class="form-row">
+            <div>
+              <label for="new-owner">Owner Name</label>
+              <input id="new-owner" type="text" placeholder="e.g. Alice" />
+            </div>
+            <div>
+              <label for="new-balance">Initial Balance (₹)</label>
+              <div class="amount-wrap">
+                <span class="currency">₹</span>
+                <input id="new-balance" type="number" min="0" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="createAccount()">Create Account</button>
+            </div>
+          </div>
+          <div id="create-alert" class="alert"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSFER PANEL -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+        Transfer Money
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label for="from-account">From Account</label>
+          <select id="from-account">
+            <option value="">— select source —</option>
+          </select>
+        </div>
+        <div>
+          <label for="to-account">To Account</label>
+          <select id="to-account">
+            <option value="">— select destination —</option>
+          </select>
+        </div>
+        <div>
+          <label for="transfer-amount">Amount (₹)</label>
+          <div class="amount-wrap">
+            <span class="currency">₹</span>
+            <input id="transfer-amount" type="number" min="0.01" step="0.01" placeholder="0.00" />
+          </div>
+        </div>
+        <div>
+          <button id="transfer-btn" class="btn btn-success" onclick="doTransfer()">
+            Transfer
+          </button>
+        </div>
+      </div>
+
+      <div id="transfer-alert" class="alert"></div>
+
+      <!-- Last transfer result detail -->
+      <div id="transfer-detail" style="display:none" class="mt-16">
+        <div class="card-title" style="font-size:.82rem;margin-bottom:10px;">Last Transfer</div>
+        <table style="width:100%;font-size:.82rem;">
+          <tbody id="transfer-detail-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /grid-2 -->
+
+  <!-- ── Transactions ── -->
+  <div class="card section-gap">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Transactions
+      <span id="txn-count" style="margin-left:auto;font-size:.78rem;color:var(--gray);font-weight:400;"></span>
+    </div>
+
+    <div id="reverse-alert" class="alert" style="margin-bottom:14px;margin-top:0;"></div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Status</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Amount</th>
+            <th>Failure Reason</th>
+            <th>Transaction ID</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="txn-body">
+          <tr><td colspan="9" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+const API_BASE = 'http://localhost:8080';
+
+// ──────────────────────────────────────────────
+// Utility helpers
+// ──────────────────────────────────────────────
+
+/** Converts paise (Long) → human-readable ₹ string */
+function fmt(paise) {
+  if (paise == null) return '—';
+  return '₹' + (paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+}
+
+/** Short UUID for display (first 8 chars) */
+function shortId(id) {
+  return id ? `<span class="uuid" title="${id}">${id.substring(0,8)}…</span>` : '—';
+}
+
+/** RFC-4122 v4 UUID */
+function uuid4() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+  );
+}
+
+function statusBadge(s) {
+  const cls = { SUCCESS:'success', FAILED:'failed', REVERSED:'reversed', PENDING:'pending' }[s] || '';
+  return `<span class="badge badge-${cls}">${s}</span>`;
+}
+
+function typeBadge(t) {
+  const cls = { TRANSFER:'transfer', DEPOSIT:'deposit', WITHDRAWAL:'withdrawal', REVERSAL:'reversal' }[t] || '';
+  return `<span class="badge badge-${cls}">${t}</span>`;
+}
+
+function accountBadge(s) {
+  const cls = { ACTIVE:'active', FROZEN:'frozen', CLOSED:'closed' }[s] || '';
+  return `<span class="badge badge-${cls}">${s}</span>`;
+}
+
+function showAlert(id, msg, type /* 'success'|'error'|'info' */) {
+  const el = document.getElementById(id);
+  el.className = `alert alert-${type} show`;
+  el.textContent = msg;
+  if (type === 'success') setTimeout(() => el.classList.remove('show'), 6000);
+}
+
+function hideAlert(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ──────────────────────────────────────────────
+// State
+// ──────────────────────────────────────────────
+let accounts = [];   // cache for dropdown labels
+
+// ──────────────────────────────────────────────
+// Load accounts
+// ──────────────────────────────────────────────
+async function loadAccounts() {
+  const resp = await fetch(API_BASE + '/api/accounts');
+  if (!resp.ok) { console.error('Failed to load accounts'); return; }
+  accounts = await resp.json();
+  renderAccounts(accounts);
+  populateDropdowns(accounts);
+}
+
+function renderAccounts(list) {
+  const tbody = document.getElementById('accounts-body');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No accounts yet — create one below.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(a => `
+    <tr>
+      <td><strong>${escHtml(a.ownerName)}</strong></td>
+      <td><strong style="color:var(--green)">${fmt(a.balance)}</strong></td>
+      <td>${accountBadge(a.status)}</td>
+      <td>${shortId(a.id)}</td>
+    </tr>
+  `).join('');
+}
+
+function populateDropdowns(list) {
+  const opts = list.map(a =>
+    `<option value="${a.id}">[${a.status}] ${escHtml(a.ownerName)} — ${fmt(a.balance)}</option>`
+  ).join('');
+  const empty = '<option value="">— select —</option>';
+  document.getElementById('from-account').innerHTML = empty + opts;
+  document.getElementById('to-account').innerHTML   = empty + opts;
+}
+
+// ──────────────────────────────────────────────
+// Load transactions
+// ──────────────────────────────────────────────
+async function loadTransactions() {
+  const resp = await fetch(API_BASE + '/api/transactions');
+  if (!resp.ok) { console.error('Failed to load transactions'); return; }
+  const txns = await resp.json();
+  renderTransactions(txns);
+}
+
+function accountName(id) {
+  if (!id) return '—';
+  const a = accounts.find(x => x.id === id);
+  return a ? `<span title="${id}">${escHtml(a.ownerName)}</span>` : shortId(id);
+}
+
+function renderTransactions(list) {
+  const tbody = document.getElementById('txn-body');
+  document.getElementById('txn-count').textContent = `${list.length} total`;
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No transactions yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(t => {
+    const canReverse = t.status === 'SUCCESS';
+    const reverseBtn = canReverse
+      ? `<button class="btn btn-sm btn-warning" onclick="doReverse('${t.id}', this)">Reverse</button>`
+      : `<button class="btn btn-sm btn-ghost" disabled>—</button>`;
+    const failureReason = t.failureReason
+      ? `<span style="color:var(--red);font-size:.78rem">${t.failureReason}</span>`
+      : '—';
+    const date = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
+    return `
+      <tr id="txn-row-${t.id}">
+        <td>${typeBadge(t.type)}</td>
+        <td>${statusBadge(t.status)}</td>
+        <td>${accountName(t.fromAccountId)}</td>
+        <td>${accountName(t.toAccountId)}</td>
+        <td><strong>${fmt(t.amount)}</strong></td>
+        <td>${failureReason}</td>
+        <td>${shortId(t.id)}</td>
+        <td style="white-space:nowrap;font-size:.8rem">${date}</td>
+        <td>${reverseBtn}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────
+// Create account
+// ──────────────────────────────────────────────
+function toggleCreate() {
+  document.getElementById('create-panel').classList.toggle('open');
+}
+
+async function createAccount() {
+  const name = document.getElementById('new-owner').value.trim();
+  const balRaw = parseFloat(document.getElementById('new-balance').value) || 0;
+  if (!name) { showAlert('create-alert', 'Owner name is required.', 'error'); return; }
+
+  const payload = { ownerName: name, initialBalance: Math.round(balRaw * 100) };
+  const resp = await fetch(API_BASE + '/api/accounts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (resp.ok || resp.status === 201) {
+    const a = await resp.json();
+    showAlert('create-alert', `Account created for ${a.ownerName} (${fmt(a.balance)}).`, 'success');
+    document.getElementById('new-owner').value   = '';
+    document.getElementById('new-balance').value = '';
+    await refreshAll();
+  } else {
+    const err = await resp.json().catch(() => ({}));
+    showAlert('create-alert', err.detail || 'Failed to create account.', 'error');
+  }
+}
+
+// ──────────────────────────────────────────────
+// Transfer
+// ──────────────────────────────────────────────
+async function doTransfer() {
+  hideAlert('transfer-alert');
+  document.getElementById('transfer-detail').style.display = 'none';
+
+  const fromId = document.getElementById('from-account').value;
+  const toId   = document.getElementById('to-account').value;
+  const amtRaw = parseFloat(document.getElementById('transfer-amount').value);
+
+  if (!fromId) { showAlert('transfer-alert', 'Please select a source account.', 'error'); return; }
+  if (!toId)   { showAlert('transfer-alert', 'Please select a destination account.', 'error'); return; }
+  if (fromId === toId) { showAlert('transfer-alert', 'Source and destination must differ.', 'error'); return; }
+  if (!amtRaw || amtRaw <= 0) { showAlert('transfer-alert', 'Enter a valid positive amount.', 'error'); return; }
+
+  const btn = document.getElementById('transfer-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Transferring…';
+
+  const payload = {
+    fromAccountId: fromId,
+    toAccountId:   toId,
+    amount:        Math.round(amtRaw * 100),
+    idempotencyKey: uuid4()
+  };
+
+  try {
+    const resp = await fetch(API_BASE + '/api/transactions/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (resp.ok || resp.status === 201) {
+      if (data.status === 'SUCCESS') {
+        showAlert('transfer-alert', `Transfer of ${fmt(payload.amount)} completed successfully.`, 'success');
+      } else if (data.status === 'FAILED') {
+        showAlert('transfer-alert', `Transfer failed: ${data.failureReason || 'Unknown reason'}.`, 'error');
+      } else {
+        showAlert('transfer-alert', `Transfer recorded with status: ${data.status}.`, 'info');
+      }
+      showTransferDetail(data);
+    } else {
+      // HTTP error (4xx/5xx)
+      const reason = data.error || data.detail || `HTTP ${resp.status}`;
+      const detail = data.detail || '';
+      showAlert('transfer-alert',
+        friendlyError(data.error) + (detail ? ` — ${detail}` : ''), 'error');
+    }
+
+    document.getElementById('transfer-amount').value = '';
+    await refreshAll();
+  } catch (e) {
+    showAlert('transfer-alert', 'Network error. Is the server running?', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Transfer';
+  }
+}
+
+function friendlyError(code) {
+  const map = {
+    INSUFFICIENT_FUNDS:    'Insufficient funds in source account.',
+    ACCOUNT_NOT_FOUND:     'Account not found.',
+    ACCOUNT_FROZEN:        'Source account is frozen.',
+    ACCOUNT_CLOSED:        'Account is closed.',
+    INVALID_AMOUNT:        'Invalid amount.',
+    SAME_ACCOUNT_TRANSFER: 'Cannot transfer to same account.',
+    DUPLICATE_REQUEST:     'Duplicate request detected.',
+    TRANSACTION_NOT_FOUND: 'Transaction not found.',
+    ALREADY_REVERSED:      'Transaction already reversed.',
+    REVERSAL_NOT_ALLOWED:  'Reversal not allowed for this transaction.',
+  };
+  return map[code] || (code ? `Error: ${code}` : 'Transfer failed.');
+}
+
+function showTransferDetail(txn) {
+  const detail = document.getElementById('transfer-detail');
+  const body   = document.getElementById('transfer-detail-body');
+  detail.style.display = 'block';
+  body.innerHTML = `
+    <tr><td style="color:var(--gray);width:120px">ID</td><td class="text-mono">${txn.id || '—'}</td></tr>
+    <tr><td style="color:var(--gray)">Type</td><td>${typeBadge(txn.type)}</td></tr>
+    <tr><td style="color:var(--gray)">Status</td><td>${statusBadge(txn.status)}</td></tr>
+    <tr><td style="color:var(--gray)">Amount</td><td><strong>${fmt(txn.amount)}</strong></td></tr>
+    ${txn.failureReason ? `<tr><td style="color:var(--gray)">Reason</td><td style="color:var(--red)">${txn.failureReason}</td></tr>` : ''}
+  `;
+}
+
+// ──────────────────────────────────────────────
+// Reverse
+// ──────────────────────────────────────────────
+async function doReverse(transactionId, btn) {
+  hideAlert('reverse-alert');
+  const confirmed = confirm(
+    `Reverse transaction ${transactionId.substring(0,8)}…?\n\nThis will undo the transfer and return funds to the original sender.`
+  );
+  if (!confirmed) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span style="color:var(--orange)">…</span>';
+
+  const payload = { transactionId, reason: 'User-initiated reversal from dashboard' };
+
+  try {
+    const resp = await fetch(API_BASE + '/api/transactions/reverse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (resp.ok || resp.status === 201) {
+      showAlert('reverse-alert',
+        `Reversal recorded. Status: ${data.status}. Funds have been returned.`, 'success');
+      await refreshAll();
+    } else {
+      const msg = friendlyError(data.error) + (data.detail ? ` — ${data.detail}` : '');
+      showAlert('reverse-alert', msg, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Reverse';
+    }
+  } catch (e) {
+    showAlert('reverse-alert', 'Network error during reversal.', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Reverse';
+  }
+}
+
+// ──────────────────────────────────────────────
+// Refresh all data
+// ──────────────────────────────────────────────
+async function refreshAll() {
+  await loadAccounts();
+  await loadTransactions();
+}
+
+// ──────────────────────────────────────────────
+// XSS guard
+// ──────────────────────────────────────────────
+function escHtml(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ──────────────────────────────────────────────
+// Boot
+// ──────────────────────────────────────────────
+refreshAll();
+</script>
+
+</body>
+</html>
